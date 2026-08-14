@@ -1,0 +1,60 @@
+[package]
+name = "zhunji_core"
+version = "0.1.0"
+description = "Zhunji SwiftUI app 的 Rust 核心（cdylib，无 tauri）"
+edition = "2021"
+
+[lib]
+name = "zhunji_core"
+crate-type = ["cdylib"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+base64 = "0.22"
+sha2 = "0.10"
+# 豆包 IME 引擎请求签名：x-ss-stub = MD5(body)。
+md-5 = "0.10"
+tokio = { version = "1", features = ["full"] }
+tokio-tungstenite = { version = "0.24", features = ["rustls-tls-webpki-roots"] }
+futures-util = "0.3"
+reqwest = { version = "0.12", default-features = false, features = ["json", "multipart", "rustls-tls", "native-tls", "stream", "system-proxy"] }
+thiserror = "1"
+anyhow = "1"
+log = "0.4"
+env_logger = "0.11"
+simplelog = "0.12"
+parking_lot = "0.12"
+once_cell = "1"
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+url = "2"
+ferrous-opencc = "0.4"
+# Audio capture.
+cpal = "0.15"
+# 豆包 IME 引擎：Opus 编码（16k mono VOIP）。
+opus = "0.3"
+
+# 热键绑定序列化/校验（shortcut_binding）与自定义组合键（combo_hotkey）。
+global-hotkey = "0.6"
+# 文本注入回退（arboard）/ 凭据钥匙串（keyring）——均为各模块平台分支使用。
+arboard = { version = "3", features = ["wayland-data-control"] }
+keyring = { version = "3.6.3", default-features = false, features = ["apple-native"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+libc = "0.2"
+core-foundation = "0.10"
+core-graphics = "0.24"
+# device_watch：CoreAudio AudioObjectAddPropertyListener 原生设备变更通知。
+coreaudio-sys = "0.2"
+# permissions（TCC 弹窗）/ capsule_focus（NSPanel 转换）的 ObjC 运行时。
+block2 = "0.5"
+objc2 = { version = "0.5", features = ["exception"] }
+objc2-foundation = "0.2"
+objc2-app-kit = "0.2"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = "symbols"

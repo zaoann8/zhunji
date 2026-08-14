@@ -1,0 +1,21 @@
+# macOS
+.DS_Store
+
+# Rust 构建产物
+core/target/
+
+# Xcode 构建产物
+build/
+app/build/
+xcuserdata/
+*.xcuserstate
+
+# build_core.sh 拷贝的核心 dylib（克隆后重新生成）
+app/Resources/libzhunji_core.dylib
+
+# 打包产物
+dist/
+
+# 运行时数据
+data/
+*.log

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- 麦克风（TCC 弹窗 + 权限查询） -->
+	<key>com.apple.security.device.audio-input</key>
+	<true/>
+	<!-- 录音时静音系统输出（osascript 控制） -->
+	<key>com.apple.security.automation.apple-events</key>
+	<true/>
+	<!-- 辅助功能（CGEvent 注入听写文本）由系统 TCC 手动授权，无需 entitlement -->
+</dict>
+</plist>
