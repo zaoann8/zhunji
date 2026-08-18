@@ -123,6 +123,16 @@ private struct SidebarView: View {
             }
 
             Spacer()
+
+            // 侧栏底部版本号：从 Bundle 读，随打包版本自动更新。
+            // padding leading 10 与 nav 按钮图标左缘对齐（aside 10 + 按钮 10）。
+            if let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String {
+                Text("v\(version)")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Color.zhInk4)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.leading, 10)
+            }
         }
         // aside 左右 10px + 底部 12px（原版 padding "30px 10px 12px"，顶部 30 由红绿灯区承担）。
         .padding(.horizontal, 10)
