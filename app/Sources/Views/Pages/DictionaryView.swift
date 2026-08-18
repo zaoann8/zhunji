@@ -48,7 +48,13 @@ struct DictionaryView: View {
         OlCard(padding: 16) {
             HStack(spacing: 8) {
                 TextField("添加热词（≤ 50 字符）", text: $input)
-                    .textFieldStyle(DictionaryInputStyle())
+                    // .plain：去掉系统默认的灰底+灰边框（用户反馈不想要），
+                    // 干净输入框，聚焦时系统自动显示 focus ring。
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 14))
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 12)
+                    .frame(maxWidth: .infinity) // 原版 input flex: 1（占满剩余空间）
                     .onSubmit { add() }
                     .onChange(of: input) { newValue in
                         // 原版 input maxLength={50}。
@@ -58,7 +64,8 @@ struct DictionaryView: View {
                         error = ""
                     }
                 Button("添加") { add() }
-                    .buttonStyle(OlGhostButtonStyle())
+                    // 与加高的输入框（vPadding 12）协调，单页覆盖（全局样式不动）。
+                    .buttonStyle(OlGhostButtonStyle(hPadding: 12, vPadding: 8))
                     .disabled(input.trimmingCharacters(in: .whitespaces).isEmpty)
             }
             if !error.isEmpty {
@@ -82,11 +89,7 @@ struct DictionaryView: View {
                     .padding(32)
             } else {
                 // 原版 flexWrap gap 6 padding 14。
-                LazyVGrid(
-                    columns: [GridItem(.adaptive(minimum: 60), spacing: 6)],
-                    alignment: .leading,
-                    spacing: 6
-                ) {
+                FlowLayout(spacing: 6) {
                     ForEach(terms, id: \.self) { term in
                         termChip(term)
                     }
@@ -156,19 +159,57 @@ struct DictionaryView: View {
     }
 }
 
-// MARK: - 输入框（原版 DictionaryPage inputStyle：padding 7/12 + 13px + r6 + line-strong + surface-2）
+/// flex-wrap 布局（原版 CSS `display:flex; flexWrap:wrap; gap:6`）：
+/// 子视图按自然宽度从左到右排列，放不下换行，永不重叠。
+/// 替代 LazyVGrid(.adaptive)——adaptive 列宽按行内最大项取，长词条
+/// 超过列宽时溢出到相邻列，与下一列 chip 视觉重叠（用户反馈"连接/遮挡"）。
+private struct FlowLayout: Layout {
+    var spacing: CGFloat = 6
 
-private struct DictionaryInputStyle: TextFieldStyle {
-    func _body(configuration: TextField<Self._Label>) -> some View {
-        configuration
-            .font(.system(size: 13))
-            .foregroundStyle(Color.zhInk)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
-            .background(RoundedRectangle(cornerRadius: 6).fill(Color.zhSurface2))
-            .overlay(
-                RoundedRectangle(cornerRadius: 6)
-                    .stroke(Color.zhLineStrong, lineWidth: 0.5)
-            )
+    func sizeThatFits(
+        proposal: ProposedViewSize,
+        subviews: Subviews,
+        cache: inout ()
+    ) -> CGSize {
+        let maxWidth = proposal.width ?? .infinity
+        var x: CGFloat = 0
+        var y: CGFloat = 0
+        var rowHeight: CGFloat = 0
+        var totalWidth: CGFloat = 0
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if x + size.width > maxWidth, x > 0 {
+                x = 0
+                y += rowHeight + spacing
+                rowHeight = 0
+            }
+            x += size.width + spacing
+            rowHeight = max(rowHeight, size.height)
+            totalWidth = max(totalWidth, x - spacing)
+        }
+        return CGSize(width: totalWidth, height: y + rowHeight)
+    }
+
+    func placeSubviews(
+        in bounds: CGRect,
+        proposal: ProposedViewSize,
+        subviews: Subviews,
+        cache: inout ()
+    ) {
+        var x = bounds.minX
+        var y = bounds.minY
+        var rowHeight: CGFloat = 0
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if x + size.width > bounds.maxX, x > bounds.minX {
+                x = bounds.minX
+                y += rowHeight + spacing
+                rowHeight = 0
+            }
+            subview.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(size))
+            x += size.width + spacing
+            rowHeight = max(rowHeight, size.height)
+        }
     }
 }
+
