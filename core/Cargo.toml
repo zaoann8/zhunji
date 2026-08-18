@@ -58,3 +58,9 @@ opt-level = 3
 lto = "thin"
 codegen-units = 1
 strip = "symbols"
+
+# cpal 0.15.3 macos Device::name() 泄漏 kAudioDevicePropertyDeviceNameCFString
+# （CF Create Rule 未释放，每次录音 +1~2 个 CFString）。0.18 才修，升级 API
+# 大改风险高 → vendor 本地补 CFRelease（见 vendor/cpal 内注释）。
+[patch.crates-io]
+cpal = { path = "vendor/cpal" }
