@@ -1309,6 +1309,11 @@ pub(super) async fn end_session(inner: &Arc<Inner>) -> Result<(), String> {
     if let Some(rec) = take_recorder_for_session(inner, current_session_id) {
         rec.stop();
         release_recording_mute(inner, "dictation");
+        // 会话收尾：归还 malloc freelist 滞留页（openless pressure_relief 移植）。
+        let freed = crate::memory::pressure_relief();
+        if freed > 0 {
+            log::info!("[memory] pressure relief freed {freed} bytes");
+        }
     }
     // 恢复用户原输入法（实时上屏切过 ABC）。
     let prev_ime = inner.live_insert.prev_ime.lock().take();

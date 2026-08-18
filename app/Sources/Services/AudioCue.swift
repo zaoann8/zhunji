@@ -11,17 +11,17 @@ final class AudioCue {
     static func playRecordStart() {
         // 连按热键时先停上一轮，避免叠音（原版 scheduleCueVoices 开头 stopVoices）。
         stop()
-        guard let player = makePlayer() else { return }
-        player.play()
-        playerQueue.append(player)
+        guard ensureCue() else { return }
+        player!.scheduleBuffer(buffer!)
+        player!.play()
     }
 
     /// 停止当前提示音（离开 recording 时调用）。
     static func stop() {
-        for player in playerQueue {
-            player.stop()
-        }
-        playerQueue.removeAll()
+        // 不 detach 常驻 player：attach/detach 会让 AudioToolbox 的
+        // ListenerMap 每次插入事件监听且从不释放（leaks 实测每 session +2 条）；
+        // 常驻节点 attach 一次，永不 detach。
+        player?.stop()
     }
 
     /// 单个正弦音的合成参数（原版 CueTone，值不变）。
@@ -38,21 +38,27 @@ final class AudioCue {
     ]
 
     private static let sampleRate = 44_100.0
-    private static var playerQueue: [AVAudioPlayerNode] = []
     /// 全局共享引擎：makePlayer 里创建的 engine 是局部变量，函数返回即释放，
     /// play() 时 node 找不到引擎 → AVAE_CheckNodeHasEngine 抛异常崩溃。
     /// 引擎必须常驻进程（原版 Web Audio 的 AudioContext 同样是页级单例）。
     private static let engine = AVAudioEngine()
+    /// 常驻 player + 预渲染 buffer：首次 ensureCue 时 attach/connect 一次。
+    /// 每次 session 只 scheduleBuffer + play（原版每次 new AudioBufferSourceNode
+    /// 是 Web Audio 语义，AVAudioPlayerNode 可复用，且复用避免了重复 attach）。
+    private static var player: AVAudioPlayerNode?
+    private static var buffer: AVAudioPCMBuffer?
 
-    /// 预渲染整段提示音到 PCM buffer（44.1kHz 单声道 Float32），尾部留 20ms 静音。
-    private static func makePlayer() -> AVAudioPlayerNode? {
+    /// 首次调用时预渲染整段提示音到 PCM buffer（44.1kHz 单声道 Float32），
+    /// 尾部留 20ms 静音；attach + connect + start 引擎只做一次。
+    private static func ensureCue() -> Bool {
+        if player != nil { return true }
         let totalMs = tones.reduce(0.0) { max($0, $1.startMs + $1.durationMs) } + 20
         let frameCount = AVAudioFrameCount(sampleRate * totalMs / 1000)
         guard let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 1),
-              let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCount)
-        else { return nil }
-        buffer.frameLength = frameCount
-        guard let samples = buffer.floatChannelData?[0] else { return nil }
+              let buf = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCount)
+        else { return false }
+        buf.frameLength = frameCount
+        guard let samples = buf.floatChannelData?[0] else { return false }
 
         // 逐采样叠加两个音：attack 5ms 线性（原版指数 ramp 用 0.0001 起步，听感近似），
         // release 指数衰减到尾部（指数不能到 0，压到 1e-4 后直切静音）。
@@ -74,17 +80,18 @@ final class AudioCue {
             }
         }
 
-        let player = AVAudioPlayerNode()
-        engine.attach(player)
-        engine.connect(player, to: engine.mainMixerNode, format: format)
+        let p = AVAudioPlayerNode()
+        engine.attach(p)
+        engine.connect(p, to: engine.mainMixerNode, format: format)
         if !engine.isRunning {
             do {
                 try engine.start() // 首次启动引擎；此后常驻，播放即时触发
             } catch {
-                return nil // 静默降级：无音频会话时放弃
+                return false // 静默降级：无音频会话时放弃
             }
         }
-        player.scheduleBuffer(buffer)
-        return player
+        player = p
+        buffer = buf
+        return true
     }
 }

@@ -24,8 +24,15 @@ final class EventSink {
     private init() {
         callback = { ptr in
             guard let ptr else { return }
-            let json = String(cString: ptr)
-            EventSink.shared.dispatch(json)
+            // core 在 Rust tokio 线程上回调：这里解析 JSON / NSLog 产生的 ObjC
+            // 对象会进该线程的 autorelease pool——tokio 线程没有 run loop，
+            // pool 永远不 drain（实测每事件滞留 1 个 NSConcreteData + 若干
+            // NSDictionary/CFString，听写驱动，永久累积）。显式包 pool，
+            // 每次回调的临时对象立即释放。
+            autoreleasepool {
+                let json = String(cString: ptr)
+                EventSink.shared.dispatch(json)
+            }
         }
     }
 

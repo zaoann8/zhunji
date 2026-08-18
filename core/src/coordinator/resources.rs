@@ -215,6 +215,12 @@ pub(super) fn stop_recorder_for_session(inner: &Arc<Inner>, session_id: SessionI
     if let Some(recorder) = take_recorder_for_session(inner, session_id) {
         recorder.stop();
         release_recording_mute(inner, "dictation");
+        // 会话收尾（cancel / startup 失败都汇集于此）：把本次会话分配后滞留在
+        // malloc freelist 的页归还内核（openless 的 pressure_relief 移植，见 memory.rs）。
+        let freed = crate::memory::pressure_relief();
+        if freed > 0 {
+            log::info!("[memory] pressure relief freed {freed} bytes");
+        }
     }
 }
 

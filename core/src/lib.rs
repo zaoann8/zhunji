@@ -16,6 +16,7 @@ mod global_hotkey_runtime;
 mod hotkey;
 mod insertion;
 mod logging;
+mod memory;
 mod net;
 mod permissions;
 mod persistence;
