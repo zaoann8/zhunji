@@ -318,11 +318,29 @@ async fn transcribe(
     let mut form = reqwest::multipart::Form::new();
     if !keyterms.is_empty() {
         // keyterm 是 xAI STT 官方热词参数（bias transcription toward specific
-        // terms，重复字段传多个词）；prompt 是 OpenAI 兼容网关的标准参数，
-        // 自建网关（one-api/grok2api 等）场景下生效，xAI 忽略无害。
-        form = form
-            .text("keyterm", keyterms.join(","))
-            .text("prompt", keyterms.join(", "));
+        // terms）：每个词一个重复字段（官方上限 100 个 × 每个 50 字符）。
+        // 逗号拼接成单个字段会被上游当成一个整体热词而无法命中（此前即如此，
+        // 热词形同虚设）；prompt 是 OpenAI 兼容网关的标准参数，自建网关
+        // （one-api/grok2api 等）场景下生效，xAI 忽略无害。
+        let terms: Vec<String> = keyterms
+            .iter()
+            .map(|t| t.trim())
+            .filter(|t| !t.is_empty())
+            .take(100) // 上游上限：最多 100 个热词
+            .map(|t| t.chars().take(50).collect()) // 上游上限：每个 50 字符
+            .collect();
+        if keyterms.len() > 100 {
+            log::warn!(
+                "[grok_stt] 热词 {} 个超过上游上限 100，截断保留前 100 个",
+                keyterms.len()
+            );
+        }
+        for term in &terms {
+            // Form::text 需要 'static，必须 clone（terms 生命周期不够）。
+            form = form.text("keyterm", term.clone());
+        }
+        let prompt = terms.join(", ");
+        form = form.text("prompt", prompt);
     }
     let form = form.text("model", "grok-stt").part("file", part);
     let url = format!("{}/v1/audio/transcriptions", base_url.trim_end_matches('/'));
